@@ -14,6 +14,8 @@ GitHub Pages：
 
 https://azhengxing.github.io/fixed-income-plus/
 
+仓库已配置为使用 GitHub Actions 自动部署 Pages。
+
 ## 本地开发
 
 ```bash
