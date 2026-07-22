@@ -9,6 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "build:pages": "next build",
+    "data:build": "python3 scripts/build_research_data.py",
     "start": "next start"
   },
   "dependencies": {
@@ -25,5 +26,5 @@
     "typescript": "5.9.3"
   },
   "type": "module",
-  "displayName": "\u56fa\u6536+\u7ec4\u5408\u900f\u89c6"
+  "displayName": "\u56fa\u6536\u589e\u5f3a\u7814\u7a76\u6863\u6848"
 }

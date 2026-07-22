@@ -21,8 +21,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "固收+组合透视｜三只基金季报与持仓演变",
-  description: "基于2025Q2至2026Q2季报，对比易方达增强回报、西部利得汇享与中银国有企业债的业绩、仓位和风险来源。",
+  title: "固收增强研究档案｜季度业绩、持仓与结构变化",
+  description: "基于2025Q2至2026Q2法定季报，持续跟踪易方达增强回报、西部利得汇享与中银国有企业债的业绩、资产结构和已披露持仓变化。",
   icons: {
     icon: `${publicBasePath}/favicon.svg`,
     shortcut: `${publicBasePath}/favicon.svg`,
