@@ -49,9 +49,11 @@ type Snapshot = {
   topBonds: Position[];
   convertibles: Position[];
   stocks: Position[];
+  disclosureNote?: string;
   sources: {
     reportPath: string;
     reportUrl: string;
+    officialUrl?: string;
     bondApiPath: string;
     bondApiUrl: string;
     stockApiPath: string;
@@ -66,6 +68,7 @@ type Fund = {
   name: string;
   manager: string;
   benchmark: string;
+  benchmarkNote?: string;
   strategy: string;
   color: string;
   latest: {
@@ -106,6 +109,8 @@ type ComparedPosition = Position & {
 const researchData = researchDataJson as ResearchData;
 const funds = researchData.funds;
 const quarters = researchData.quarters;
+const latestQuarter = quarters.at(-1)!;
+const latestDate = funds[0].snapshots.at(-1)!.date;
 const repositoryBase = "https://github.com/AZhengXing/fixed-income-plus";
 const totalConvertibleRows = funds.reduce(
   (total, fund) => total + fund.snapshots.reduce((subtotal, snapshot) => subtotal + snapshot.convertibles.length, 0),
@@ -154,13 +159,16 @@ function TrendChart() {
   const allValues = series.flatMap((item) => item.values);
   const min = Math.floor(Math.min(...allValues)) - 1;
   const max = Math.ceil(Math.max(...allValues)) + 1;
-  const labels = ["25-03", "25-06", "25-09", "25-12", "26-03", "26-06"];
+  const labels = ["25-03", ...quarters.map((quarter) => {
+    const item = funds[0].snapshots.find((snapshot) => snapshot.label === quarter)!;
+    return item.date.slice(2, 7);
+  })];
   const x = (index: number) => padding.left + (index / (labels.length - 1)) * (width - padding.left - padding.right);
   const y = (value: number) => padding.top + ((max - value) / (max - min)) * (height - padding.top - padding.bottom);
   const ticks = Array.from({ length: 4 }, (_, index) => min + ((max - min) / 3) * index);
 
   return (
-    <div className="trend-chart" role="img" aria-label="三只基金近五季度复合净值指数">
+    <div className="trend-chart" role="img" aria-label="三只基金跟踪期复合净值指数">
       <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
         {ticks.map((tick) => (
           <g key={tick}>
@@ -349,7 +357,7 @@ function HistoryTable({ fund, selectedQuarter, onSelect }: { fund: Fund; selecte
 
 export default function Home() {
   const [selectedFundId, setSelectedFundId] = useState<Fund["id"]>("ef");
-  const [selectedQuarter, setSelectedQuarter] = useState("2026Q2");
+  const [selectedQuarter, setSelectedQuarter] = useState(latestQuarter);
   const [assetView, setAssetView] = useState<AssetView>("overview");
   const [positionQuery, setPositionQuery] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -379,13 +387,13 @@ export default function Home() {
     <main>
       <header className="site-header">
         <a className="brand" href="#overview"><span>FI+</span><b>固收增强研究档案</b></a>
-        <div className="as-of">数据期末 <b>2026-06-30</b></div>
+        <div className="as-of">数据期末 <b>{latestDate}</b></div>
         <nav aria-label="页面导航"><a href="#overview">研究摘要</a><a href="#performance">业绩</a><a href="#holdings">持仓</a><a href="#methodology">方法与来源</a></nav>
       </header>
 
       <section className="hero" id="overview">
         <div className="hero-copy">
-          <div className="eyebrow">QUARTERLY RESEARCH ARCHIVE · 2026 Q2</div>
+          <div className="eyebrow">QUARTERLY RESEARCH ARCHIVE · {latestQuarter}</div>
           <h1>三只固收增强产品<br />季度跟踪档案</h1>
           <p>基于基金法定定期报告，持续记录业绩、资产结构、已披露证券与季度变动。页面用于长期观察策略是否漂移、风险来源如何变化，不构成产品推介或购买建议。</p>
           <div className="archive-stats">
@@ -397,7 +405,7 @@ export default function Home() {
           <div className="research-scope"><strong>研究窗口</strong><span>{researchData.period}</span><strong>更新频率</strong><span>季报披露后</span></div>
         </div>
         <div className="hero-chart-panel">
-          <div className="panel-heading"><div><span className="section-index">01</span><h2>近五季复合净值指数</h2></div><span>2025-03-31 = 100</span></div>
+          <div className="panel-heading"><div><span className="section-index">01</span><h2>跟踪期复合净值指数</h2></div><span>2025-03-31 = 100</span></div>
           <TrendChart />
           <p className="chart-note">按各季报 A 类份额“过去三个月”净值增长率逐季复合，仅用于统一观察窗口内的路径比较。</p>
         </div>
@@ -419,15 +427,15 @@ export default function Home() {
       </section>
 
       <section className="section performance-section" id="performance">
-        <div className="section-heading"><div><span className="section-index">02</span><h2>业绩与风险观察</h2></div><p>收益区间统一到 2026-06-30；“超额”仅相对于各基金自身季报基准，不用于跨基金直接排名。</p></div>
+        <div className="section-heading"><div><span className="section-index">02</span><h2>业绩与风险观察</h2></div><p>收益区间统一到 {latestDate}；“超额”仅相对于各基金自身季报基准，不用于跨基金直接排名。</p></div>
         <div className="performance-grid">
           <div className="performance-table-wrap">
             <table className="performance-table">
-              <thead><tr><th>基金（A类）</th><th>2026Q2</th><th>近6月</th><th>近1年</th><th>近3年</th><th>近5年</th><th>Q2 相对基准</th></tr></thead>
+              <thead><tr><th>基金（A类）</th><th>{latestQuarter}</th><th>近6月</th><th>近1年</th><th>近3年</th><th>近5年</th><th>本季相对基准</th></tr></thead>
               <tbody>
                 {funds.map((item) => (
                   <tr key={item.id}>
-                    <td><i style={{ background: item.color }} /><b>{item.shortName}</b><small>{item.code} · {item.benchmark}</small></td>
+                    <td><i style={{ background: item.color }} /><b>{item.shortName}</b><small>{item.code} · {item.benchmark}</small>{item.benchmarkNote && <small>{item.benchmarkNote}</small>}</td>
                     <td className={item.latest.quarter < 0 ? "negative" : "positive"}>{formatPercent(item.latest.quarter, true)}</td>
                     <td>{formatPercent(item.latest.sixMonth, true)}</td><td>{formatPercent(item.latest.oneYear, true)}</td><td>{formatPercent(item.latest.threeYear, true)}</td><td>{formatPercent(item.latest.fiveYear, true)}</td>
                     <td className={item.latest.quarter - item.latest.benchmarkQuarter < 0 ? "negative" : "positive"}>{formatPercent(item.latest.quarter - item.latest.benchmarkQuarter, true)}</td>
@@ -437,15 +445,15 @@ export default function Home() {
             </table>
           </div>
           <aside className="research-note">
-            <span>2026Q2 观察</span>
+            <span>{latestQuarter} 观察</span>
             <h3>收益差异来自资产结构，不能只看“固收+”标签。</h3>
-            <ul><li>易方达：股票拖累与短融增配并存。</li><li>西部利得：124.09% 债券仓位意味着杠杆仍是重要变量。</li><li>中银：企业债继续替代政策金融债，信用票息贡献提高。</li></ul>
+            <ul><li>易方达：股票与转债仓位提高，债券仓位降至净资产以下。</li><li>西部利得：债券仓位升至 127.68%，转债升至 12.55%。</li><li>中银：企业债与转债占比回落。</li></ul><p>西部利得于 7 月 27 日、中银于 9 月 21 日调整基准；超额采用各自季报分段计算后的基准收益。</p>
           </aside>
         </div>
       </section>
 
       <section className="section holdings-section" id="holdings">
-        <div className="section-heading"><div><span className="section-index">03</span><h2>季度持仓分析</h2></div><p>完整解析每只基金的债券分类、前五大债券、全部公开转债明细、前十大股票与现金汇总，并与上一季度逐项比较。</p></div>
+        <div className="section-heading"><div><span className="section-index">03</span><h2>季度持仓分析</h2></div><p>解析每只基金的债券分类、前五大债券、已披露转债明细、前十大股票与现金汇总，并与上一季度逐项比较。</p></div>
 
         <div className="fund-tabs" role="tablist" aria-label="选择基金">
           {funds.map((item) => (
@@ -474,6 +482,7 @@ export default function Home() {
             <div><small>银行现金及备付金</small><strong>{formatPercent(snapshot.cash.bankCashWeight)}</strong></div>
           </div>
 
+          {snapshot.disclosureNote && <div className="method-callout"><strong>本季来源与披露边界</strong><p>{snapshot.disclosureNote}</p><a href={snapshot.sources.officialUrl} target="_blank" rel="noreferrer">基金管理人官方季报 ↗</a></div>}
           <ChangeBrief snapshot={snapshot} previous={previous} />
 
           <div className="asset-tabs" role="tablist" aria-label="选择资产类别">
@@ -492,7 +501,7 @@ export default function Home() {
                     <article><b>{formatPercent(snapshot.cash.bankCashWeight)}</b><span>银行现金及备付金</span><p>另有买入返售金融资产 {formatPercent(snapshot.cash.reverseRepoWeight)}，两者均为总额披露。</p></article>
                   </div>
                 </div>
-                <div className="history-block"><div className="subsection-heading"><div><span>QUARTERLY HISTORY</span><h4>五季度变动表</h4></div><small>点击行可切换季度</small></div><HistoryTable fund={fund} selectedQuarter={selectedQuarter} onSelect={selectQuarter} /></div>
+                <div className="history-block"><div className="subsection-heading"><div><span>QUARTERLY HISTORY</span><h4>季度变动表</h4></div><small>点击行可切换季度</small></div><HistoryTable fund={fund} selectedQuarter={selectedQuarter} onSelect={selectQuarter} /></div>
               </div>
             )}
 
@@ -502,7 +511,7 @@ export default function Home() {
                   <div><span>{assetView === "bond" ? "TOP 5 DISCLOSURE" : assetView === "convertible" ? "DISCLOSED CONVERTIBLES" : "TOP 10 DISCLOSURE"}</span><h4>{assetView === "bond" ? "前五大债券及季度变化" : assetView === "convertible" ? "可转债 / 可交换债逐项变化" : "前十大股票及季度变化"}</h4></div>
                   {assetView === "convertible" && <label className="position-search"><span>筛选</span><input value={positionQuery} onChange={(event) => setPositionQuery(event.target.value)} placeholder="代码或名称" /></label>}
                 </div>
-                <p className="disclosure-note">{assetView === "bond" ? "下表是法定季报前五大债券，不代表全部普通债券持仓；“本季未列示”仅表示退出前五名。" : assetView === "convertible" ? "列示公开持仓快照中的可转债和可交换债；权重加总可能因四舍五入、尚未进入转股期或数据口径差异而低于分类总额。" : "季度报告仅披露前十大股票；“本季未列示”不等同于已经清仓。"}</p>
+                <p className="disclosure-note">{assetView === "bond" ? "下表是法定季报前五大债券，不代表全部普通债券持仓；“本季未列示”仅表示退出前五名。" : assetView === "convertible" ? "Q3 列示季报处于转股期的转债明细，历史季度列示归档公开快照；权重合计可能因四舍五入、转股期范围或来源口径低于分类总额。新增/未列示只表示披露表变化，不代表买入/清仓。" : "季度报告仅披露前十大股票；“本季未列示”不等同于已经清仓。"}</p>
                 <PositionSummary current={activePositions} previous={previousPositions} total={activeTotal} label={assetView === "bond" ? "债券仓位" : assetView === "convertible" ? "转债分类" : "股票仓位"} />
                 <PositionTable current={activePositions} previous={previousPositions} assetClass={assetView} query={positionQuery} showAll={showAll} />
                 {assetView === "convertible" && !showAll && !positionQuery && positionComparison(activePositions, previousPositions).length > 20 && <button className="show-all" onClick={() => setShowAll(true)}>显示全部 {positionComparison(activePositions, previousPositions).length} 条记录</button>}
@@ -534,14 +543,14 @@ export default function Home() {
         <div className="monitor-grid">
           <article><span>01 · EQUITY</span><h3>易方达：权益风格与资本债集中度</h3><p>跟踪股票仓位、前十大集中度、周期/红利风格变化，以及银行二级资本债是否继续集中在少数发行人。</p></article>
           <article><span>02 · LEVERAGE</span><h3>西部利得：回购杠杆与信用利差</h3><p>重点观察债券仓位是否长期维持 120% 以上、中票与银行资本债结构、融资成本和转债估值敏感度。</p></article>
-          <article><span>03 · CREDIT</span><h3>中银：企业债替代政策金融债</h3><p>企业债已从 17.15% 升至 33.06%；后续需要结合半年报和年报核对信用等级、行业与发行人分布。</p></article>
+          <article><span>03 · CREDIT</span><h3>中银：信用结构与管理团队变化</h3><p>Q3 企业债占比回落至 30.16%；继续核对信用等级、行业和发行人分布，并跟踪经理与业绩基准调整后的策略变化。</p></article>
         </div>
       </section>
 
       <section className="section methodology-section" id="methodology">
         <div className="section-heading"><div><span className="section-index">05</span><h2>方法、披露边界与源数据</h2></div><p>所有原始资料统一保存在仓库的 <code>source-data/</code>，包含来源网址、抓取日期与 SHA-256 校验值。</p></div>
         <div className="method-grid">
-          <article><span>原始文件</span><h3>15 份季度报告 PDF</h3><p>按基金代码和季度归档，PDF 是资产结构、收益与法定披露的主依据。</p><a href={`${repositoryBase}/tree/main/source-data/reports`} target="_blank" rel="noreferrer">打开报告目录 ↗</a></article>
+          <article><span>原始文件</span><h3>{researchData.coverage.reports} 份季度报告 PDF</h3><p>按基金代码和季度归档，PDF 是资产结构、收益与法定披露的主依据。</p><a href={`${repositoryBase}/tree/main/source-data/reports`} target="_blank" rel="noreferrer">打开报告目录 ↗</a></article>
           <article><span>接口快照</span><h3>债券与股票公开持仓响应</h3><p>保留 2025、2026 年原始响应，主要用于还原证券名称与逐项历史表格。</p><a href={`${repositoryBase}/tree/main/source-data/api`} target="_blank" rel="noreferrer">打开接口快照目录 ↗</a></article>
           <article><span>可复核数据</span><h3>JSON + CSV 解析结果</h3><p>网页读取同一份研究 JSON；季度汇总和逐项持仓另存 CSV，便于 Excel 检查。</p><a href={`${repositoryBase}/tree/main/source-data/processed`} target="_blank" rel="noreferrer">打开解析数据目录 ↗</a></article>
           <article><span>来源清单</span><h3>逐文件来源与校验值</h3><p>每个文件均记录本地路径、基金、期间、发布方、原始网址、抓取日和哈希。</p><a href={repoFileUrl("source-data/SOURCES.csv")} target="_blank" rel="noreferrer">查看 SOURCES.csv ↗</a></article>
@@ -555,7 +564,7 @@ export default function Home() {
         <div className="reference-note"><span>信息架构参考</span><a href="https://www.morningstar.cn/fund/110017.html" target="_blank" rel="noreferrer">晨星基金档案页 ↗</a><p>借鉴其“业绩—风险—投资组合—策略—来源”的研究顺序，不使用星级或营销结论替代原始报告分析。</p></div>
       </section>
 
-      <footer><div><b>固收增强研究档案</b><span>数据快照 2026-06-30 · 源数据整理 {researchData.generatedAt}</span></div><p>过往业绩不代表未来表现。本页面仅供个人研究记录，不构成投资建议。</p><a href="#overview">回到顶部 ↑</a></footer>
+      <footer><div><b>固收增强研究档案</b><span>数据快照 {latestDate} · 源数据整理 {researchData.generatedAt}</span></div><p>过往业绩不代表未来表现。本页面仅供个人研究记录，不构成投资建议。</p><a href="#overview">回到顶部 ↑</a></footer>
     </main>
   );
 }

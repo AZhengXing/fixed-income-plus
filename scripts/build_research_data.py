@@ -20,8 +20,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = ROOT / "source-data"
 PROCESSED_ROOT = SOURCE_ROOT / "processed"
-QUARTERS = ["2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2"]
-RETRIEVED_AT = "2026-07-22"
+QUARTERS = ["2025Q2", "2025Q3", "2025Q4", "2026Q1", "2026Q2", "2026Q3"]
+RETRIEVED_AT = "2026-11-02"
+Q3_SOURCES = json.loads((SOURCE_ROOT / "2026Q3-sources.json").read_text(encoding="utf-8"))
 
 REPORT_IDS = {
     "110017": {
@@ -56,15 +57,6 @@ FUND_CONFIG = {
         "benchmark": "中债总指数（全价）",
         "strategy": "股票增强 + 银行资本债 + 可转债",
         "color": "#0b7f91",
-        "latest": {
-            "quarter": -0.36,
-            "sixMonth": 0.34,
-            "oneYear": 2.89,
-            "threeYear": 15.73,
-            "fiveYear": 22.41,
-            "volatility": 0.13,
-            "benchmarkQuarter": 0.49,
-        },
         "quarterly": {
             "2025Q2": (1.92, 4.62, 14.39, "债券仓位超过净资产 100%，股票与转债同时提供增强，风险来源最为分散。"),
             "2025Q3": (1.53, 4.48, 13.94, "主动降低债券杠杆与转债仓位，股票仍接近 14%，紫金矿业升为第一大股票。"),
@@ -81,15 +73,6 @@ FUND_CONFIG = {
         "benchmark": "中债综合指数收益率",
         "strategy": "信用票息 + 回购杠杆 + 分散可转债",
         "color": "#233d73",
-        "latest": {
-            "quarter": 0.74,
-            "sixMonth": 2.28,
-            "oneYear": 3.79,
-            "threeYear": 13.90,
-            "fiveYear": 23.04,
-            "volatility": 0.09,
-            "benchmarkQuarter": 0.62,
-        },
         "quarterly": {
             "2025Q2": (1.47, 5.74, 0.00, "中期票据占净资产过半，转债 15.01%；增强主要来自信用利差、杠杆与转债。"),
             "2025Q3": (0.48, 5.51, 0.00, "中票升至 59.23%，债券仓位维持 120% 以上，转债仓位略有下降。"),
@@ -106,15 +89,6 @@ FUND_CONFIG = {
         "benchmark": "中债综合全价（总值）指数",
         "strategy": "企业债 + 政策金融债 + 可转债",
         "color": "#15745f",
-        "latest": {
-            "quarter": 1.23,
-            "sixMonth": 2.29,
-            "oneYear": 4.80,
-            "threeYear": 16.05,
-            "fiveYear": 25.98,
-            "volatility": 0.10,
-            "benchmarkQuarter": 0.62,
-        },
         "quarterly": {
             "2025Q2": (1.17, 6.65, 0.00, "两只国开债合计 13.92%，政策金融债较集中；转债仓位处于五季高位。"),
             "2025Q3": (1.51, 7.28, 0.00, "债券杠杆下降，国开债与金融债仍是组合主体。"),
@@ -290,6 +264,90 @@ def api_url(code: str, source_type: str, year: str) -> str:
     )
 
 
+def parse_q3(code: str) -> tuple[dict, dict]:
+    """Read Q3 directly from statutory reports; never fill missing data with zero."""
+    meta = Q3_SOURCES[code]
+    path = SOURCE_ROOT / "reports" / code / "2026Q3.pdf"
+    text = pdf_text(path)
+    if "2026" not in text or "9 月 30 日" not in text or code not in text:
+        raise ValueError(f"Unexpected report identity: {path}")
+    category_text = re.search(r"5\.4\s*报告期末按债券品种分类的债券投资组合(.*?)5\.5\s*报告期末", text, re.S).group(1)
+    for label in ("国家债券", "央行票据", "金融债券", "政策性金融债", "企业债券", "企业短期融资券", "中期票据", "可转债（可交换债）", "同业存单", "其他", "合计"):
+        if label not in category_text:
+            raise ValueError(f"Missing bond category {label}: {path}")
+    item = parse_pdf_snapshot(path)
+    item["netAssets"] = round(item["netAssets"], 2)
+    raw = subprocess.run(["pdftotext", "-raw", str(path), "-"],
+                         check=True, capture_output=True, text=True).stdout
+    # Remove running headers and page numbers before joining wrapped table rows.
+    raw = re.sub(r"[^\n]*2026 年第 3 季度报告[^\n]*\n(?:第 \d+页 共 \d+页|\d+)?\n?", "", raw)
+
+    def positions(section: str, quantity: bool) -> list[dict]:
+        qty = r"[\d,]+\s+" if quantity else ""
+        pattern = (r"(?m)^\s*(\d+)\s+(\d{6,9})\s+(.+?)\s+" + qty
+                   + r"([\d,]+\.\d{2})\s+(\d+\.\d{2})(?=\s|$)")
+        rows = []
+        for match in re.finditer(pattern, section, re.S):
+            rank, security, name, amount, weight = match.groups()
+            name = re.sub(r"\s+", "", name)
+            rows.append(dict(rank=int(rank), code=security, name=name,
+                             weight=float(weight), marketValueWan=round(float(amount.replace(",", ""))/10000, 6),
+                             kind=infer_bond_kind(name)))
+        if rows and [r["rank"] for r in rows] != list(range(1, len(rows)+1)):
+            raise ValueError(f"Non-contiguous ranks: {path}")
+        return rows
+
+    top = raw.split("5.5 ", 1)[1].split("5.6 ", 1)[0]
+    top_bonds = positions(top, True)
+    if len(top_bonds) != 5:
+        raise ValueError(f"Expected five bonds: {path}")
+    for row in top_bonds:
+        if "银行" in row["name"] and "二级" in row["name"]:
+            row["kind"] = "银行资本债/金融债"
+    convertible_section = raw.split("处于转股期的可转换债券明细", 1)[1]
+    convertible_section = re.split(r"5\.\d+\.5|§6", convertible_section)[0]
+    convertibles = positions(convertible_section, False)
+    if not convertibles and item["categories"]["convertible"] > 0:
+        raise ValueError(f"Missing convertible rows: {path}")
+    for row in convertibles:
+        row["kind"] = "可转债/可交换债"
+    stock_section = raw.split("5.3 ", 1)[1].split("5.4 ", 1)[0]
+    stocks = positions(stock_section, True)
+    for row in stocks:
+        row["kind"] = "股票"
+    # Stocks use NAV denominator, not the gross-assets percentage from section 5.1.
+    if stocks:
+        industry = text.split("5.2 ", 1)[1].split("5.3 ", 1)[0]
+        stock_weight = value_after_label(industry, "合计")
+        if len(stocks) != 10 or stock_weight <= 0:
+            raise ValueError(f"Incomplete stock disclosure: {path}")
+    elif "未持有股票" in stock_section:
+        stock_weight = 0.0
+    else:
+        raise ValueError(f"Missing stock disclosure: {path}")
+    other_amount = amount_after_label(text, "其他各项资产") or amount_after_label(text, "其他资产")
+    item["cash"]["otherAssetsAmount"] = other_amount
+    item["cash"]["otherAssetsWeight"] = other_amount/item["netAssets"]*100
+    performance = re.sub(r"\s+", "", raw.split("3.2.1", 1)[1].split("3.2.2", 1)[0])
+    def performance_row(label: str) -> list[float]:
+        match = re.search(label + r"((-?\d+\.\d+%){6})", performance)
+        if not match:
+            raise ValueError(f"Missing performance {label}: {path}")
+        return [float(v) for v in re.findall(r"-?\d+\.\d+(?=%)", match.group(1))]
+    quarter = performance_row("过去三个月")
+    latest = dict(quarter=quarter[0], sixMonth=performance_row("过去六个月")[0],
+                  oneYear=performance_row("过去一年")[0], threeYear=performance_row("过去三年")[0],
+                  fiveYear=performance_row("过去五年")[0], volatility=quarter[1], benchmarkQuarter=quarter[2])
+    item.update(label="2026Q3", date="2026-09-30", quarterReturn=latest["quarter"],
+                oneYearReturn=latest["oneYear"], stock=stock_weight, note=meta["note"],
+                topBonds=top_bonds, convertibles=convertibles, stocks=stocks,
+                disclosureNote="Q3 个券直接解析季报原文；转债表仅覆盖处于转股期的披露明细，不能视为全部转债。持仓接口快照未取得，未使用估算补齐。",
+                sources=dict(reportPath=f"source-data/reports/{code}/2026Q3.pdf",
+                             reportUrl=meta["archiveUrl"], officialUrl=meta["officialUrl"],
+                             bondApiPath="", bondApiUrl="", stockApiPath="", stockApiUrl=""))
+    return item, latest
+
+
 def build_data() -> dict:
     funds = []
     for code, config in FUND_CONFIG.items():
@@ -300,7 +358,11 @@ def build_data() -> dict:
             stock_api.update(parse_api_file(SOURCE_ROOT / "api" / code / f"stock-holdings-{year}.js", "股票"))
 
         snapshots = []
+        q3, latest = parse_q3(code)
         for label in QUARTERS:
+            if label == "2026Q3":
+                snapshots.append(q3)
+                continue
             path = SOURCE_ROOT / "reports" / code / f"{label}.pdf"
             snapshot = parse_pdf_snapshot(path)
             quarter_return, one_year_return, stock_weight, note = config["quarterly"][label]
@@ -344,24 +406,25 @@ def build_data() -> dict:
                 "code": code,
                 "shortName": config["shortName"],
                 "name": config["name"],
-                "manager": config["manager"],
-                "benchmark": config["benchmark"],
+                "manager": Q3_SOURCES[code].get("manager", config["manager"]),
+                "benchmark": Q3_SOURCES[code].get("benchmark", config["benchmark"]),
+                "benchmarkNote": Q3_SOURCES[code].get("benchmarkNote", ""),
                 "strategy": config["strategy"],
                 "color": config["color"],
-                "latest": config["latest"],
+                "latest": latest,
                 "snapshots": snapshots,
             }
         )
 
     return {
         "generatedAt": RETRIEVED_AT,
-        "period": "2025Q2—2026Q2",
+        "period": "2025Q2—2026Q3",
         "quarters": QUARTERS,
         "coverage": {
-            "reports": 15,
+            "reports": 18,
             "funds": 3,
-            "quarters": 5,
-            "bondDisclosure": "季度报告前五大债券；公开持仓快照同时列示报告披露的可转债明细。",
+            "quarters": len(QUARTERS),
+            "bondDisclosure": "季度报告前五大债券；转债为季报处于转股期明细或历史公开快照，均非全部个券。",
             "stockDisclosure": "季度报告前十大股票，并非全部股票持仓。",
             "cashDisclosure": "银行存款和结算备付金、买入返售金融资产为汇总项目。",
         },
@@ -456,11 +519,18 @@ def write_sources_csv() -> None:
                         "source_type": "quarterly_report_pdf",
                         "publisher": "基金管理人（东方财富公告镜像）",
                         "source_url": report_url(report_id),
-                        "retrieved_at": RETRIEVED_AT,
+                        "retrieved_at": "2026-07-22",
                         "sha256": sha256(local),
                         "note": "法定季度报告原文",
                     }
                 )
+            meta = Q3_SOURCES[code]
+            local = SOURCE_ROOT / "reports" / code / "2026Q3.pdf"
+            writer.writerow(dict(local_path=local.relative_to(ROOT).as_posix(), fund_code=code,
+                                 period="2026Q3", source_type="quarterly_report_pdf",
+                                 publisher=meta["publisher"], source_url=meta["archiveUrl"],
+                                 retrieved_at=RETRIEVED_AT, sha256=sha256(local),
+                                 note="法定季度报告原文；官方入口：" + meta["officialUrl"]))
             for year in ("2025", "2026"):
                 for filename, source_type, api_type, note in (
                     (f"bond-holdings-{year}.js", "bond_holdings_api_snapshot", "zqcc", "债券前五与可转债公开持仓快照"),
@@ -475,7 +545,7 @@ def write_sources_csv() -> None:
                             "source_type": source_type,
                             "publisher": "天天基金",
                             "source_url": api_url(code, api_type, year),
-                            "retrieved_at": RETRIEVED_AT,
+                            "retrieved_at": "2026-07-22",
                             "sha256": sha256(local),
                             "note": note,
                         }

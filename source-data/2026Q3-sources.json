@@ -1,0 +1,39 @@
+{
+  "110017": {
+    "officialUrl": "https://cdn.efunds.com.cn/owch/data/bulletin/20261027/易方达增强回报债券型证券投资基金2026年第3季度报告.pdf",
+    "archiveUrl": "https://cdn.efunds.com.cn/owch/data/bulletin/20261027/易方达增强回报债券型证券投资基金2026年第3季度报告.pdf",
+    "publisher": "易方达基金管理有限公司",
+    "publishedAt": "2026-10-27",
+    "retrievedAt": "2026-11-02",
+    "reportStatus": "available",
+    "holdingsApiStatus": "unavailable",
+    "note": "股票由 12.12% 升至 13.70%，债券降至 81.68%；转债升至 6.11%，买入返售资产增加，前五大债券含三峡 EB2。"
+  },
+  "675111": {
+    "officialUrl": "https://www.westleadfund.com/upload/pdf/1792746453500-西部利得汇享债券型证券投资基金2026年第3季度报告.pdf",
+    "officialListingUrl": "https://www.westleadfund.com/news/info/dqgg/index2.html",
+    "archiveUrl": "https://pdf.dfcfw.com/pdf/H2_AN202610261830898827_1.pdf",
+    "publisher": "西部利得基金管理有限公司（东方财富公告镜像）",
+    "publishedAt": "2026-10-26",
+    "retrievedAt": "2026-11-02",
+    "reportStatus": "available_via_mirror",
+    "holdingsApiStatus": "unavailable",
+    "benchmark": "中债-综合全价(总值)指数收益率×90% + 中证可转换债券指数收益率×10%",
+    "benchmarkNote": "2026-07-27 调整业绩基准；Q3 基准收益按季报公布的分段口径为 -0.04%，不追溯改写历史基准。",
+    "note": "债券由 124.09% 升至 127.68%，转债由 10.33% 升至 12.55%；无直接股票，兴业转债升为第一大债券。7 月 27 日调整业绩基准。"
+  },
+  "001235": {
+    "officialUrl": "https://www.bocim.com/newsite/upload/zy/jj/jb/1793012998428_23.pdf",
+    "officialListingUrl": "https://www.bocim.com/Channel/71210?id=1153983",
+    "archiveUrl": "https://www.bocim.com/newsite/upload/zy/jj/jb/1793012998428_23.pdf",
+    "publisher": "中银基金管理有限公司",
+    "publishedAt": "2026-10-27",
+    "retrievedAt": "2026-11-02",
+    "reportStatus": "available",
+    "holdingsApiStatus": "unavailable",
+    "manager": "王晓彦 / 陈玮 / 王悦宁（Q3 季报名单）",
+    "benchmark": "中证可转债及可交换债券指数收益率×5% + 中债-高信用等级债券全价(总值)指数收益率×90% + 活期存款基准利率×5%",
+    "benchmarkNote": "2026-09-21 调整业绩基准；Q3 基准收益采用季报公布的 0.36%，不追溯改写历史基准。经理名单按 Q3 季报，并非实时名单。",
+    "note": "企业债由 33.06% 降至 30.16%，政策金融债降至 16.49%，转债降至 6.21%；新增经理陈玮、王悦宁，9 月 21 日调整业绩基准。"
+  }
+}
